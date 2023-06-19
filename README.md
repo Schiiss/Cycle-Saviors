@@ -21,6 +21,27 @@ We want to help fill the gap in stolen bike searchability by creating a bike the
 
 ## Getting Started
 Dependency management and environment are handled in `devcontainer`
-1. Launch VS Code, hit `ctrl+shift+p` to open the command pallete, type `Dev Containers: Rebuild and Reopen in Container` - you are now developing in custom container. `src` contains all functions and are installed in editable mode to be able to `import` live from anywhere in the repo.
+1. Clone this repository
+2. Ideally open the codebase in VS Code
+3. Rename `configs/.env-example` to `configs/.env` and fill in the secrets
+4. In VS Code run `ctrl+shift+p` to open the command pallete, type `Dev Containers: Rebuild and Reopen in Container` - you are now developing in custom container.
+    - All packages will be installed container wide from `requirements.txt` pinned to Python 3.10
+    - All functions under `src` will be installed as an editable package and available for import anywhere in repo
+    - Keys defined in `configs/.env` will be available container wide from `os.getenv()` - no need to `loaddotenv()` in python
 2. You can `pip install` directly in the container. When adding new packages before making a commit run `pip list --format=freeze > requirements.txt --exclude-editable`
-3. Pipelines contain code to scrape marketplaces and upsert embeddings to Pinecone index. Each pipeline has a `config.yaml` and a `main.py` to execute. 
+
+#### File Structure
+Overview of repository codebase
+
+├── .devcontainer           # Containerized environment management
+├── app                     # Frontend application files
+├── data                    # Output of batch pipelines
+├── pipelines               # Batch pipelines
+│   ├── scraping            # Scrape web data
+│   └── index               # Create Pinecone index and upsert
+├── src                     # Source files installed in editable mode
+├── .gitignore
+├── pyproject.toml
+├── requirements.txt
+├── setup.cfg
+└── README.md

@@ -11,6 +11,10 @@
 			]
 		}
 	},
+
+	// Set environment variables container wide
+	"runArgs": ["--env-file","configs/.env"], 
+
 	// Features to add to the dev container. More info: https://containers.dev/features.
 	// "features": {},
 

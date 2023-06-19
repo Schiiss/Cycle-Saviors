@@ -10,6 +10,11 @@ class KijijiScrape:
     """Class to interact with Kijiji html content"""
 
     def __init__(self, soup):
+        """Instantiate
+
+        Args:
+            soup: raw html content
+        """
 
         self.soup = soup
     
