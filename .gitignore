@@ -1,3 +1,6 @@
+# Ignore notebooks files
+*.ipynb_checkpoints
+
 # Ignore data files
 *.jpg
 *.csv
