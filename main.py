@@ -20,6 +20,9 @@ openai.api_key = os.getenv('OPENAI_API_KEY')
 openai.api_base = os.getenv('OPENAI_API_ENDPOINT')
 openai.api_type = 'azure'
 openai.api_version = '2023-03-15-preview'
+os.environ["LANGCHAIN_TRACING_V2"] = "true"
+os.environ["LANGCHAIN_ENDPOINT"] = "https://api.langchain.plus"
+os.getenv('LANGCHAIN_API_KEY')
 
 llm = AzureOpenAI(deployment_name="davinci",
                   model_name="text-davinci-003", temperature=0)
@@ -46,14 +49,14 @@ def get_user_ip_address(a):
 
 tools = [
     Tool(
+        name="Search Bike Index",
+        func=call_bike_index_api,
+        description="Useful for searching for stolen bikes in a particular area. The input to this tool should be the user's IP address",
+    ),
+    Tool(
         name="Get User IP Address",
         func=get_user_ip_address,
         description="Useful for getting the user's IP address.",
-    ),
-    Tool(
-        name="Search Bike Index",
-        func=call_bike_index_api,
-        description="Useful for searching for stolen bikes in a particular area. The input to this tool should be the user's IP address. For example, if the user's IP address is 0.0.0.0 then the input should be 0.0.0.0",
     )
 ]
 
@@ -108,13 +111,11 @@ class CustomOutputParser(AgentOutputParser):
 output_parser = CustomOutputParser()
 
 # Set up the base template
-template_with_history = """Assistant is a large language model trained by OpenAI. Assistant is designed to be able to assist with finding a users lost/stolen bike
+template_with_history = """Assistant is designed to be able to assist with finding a users lost/stolen bike
 As a language model, Assistant is able to generate human-like text based on the input it receives, allowing it to engage in natural-sounding conversations and provide responses that are coherent and relevant to the topic at hand. 
 Assistant is constantly learning and improving, and its capabilities are constantly evolving. 
-It is able to process and understand large amounts of text, and can use this knowledge to provide accurate and informative responses to a wide range of questions. 
-Additionally, Assistant is able to generate its own text based on the input it receives, allowing it to engage in discussions and provide explanations and descriptions on a wide range of topics.
-Overall, Assistant is a powerful tool that can help with a wide range of tasks and provide valuable insights and information on a wide range of topics. 
-Whether you need help with a specific question or just want to have a conversation about a particular topic, Assistant is here to assist.
+It is able to process and understand large amounts of text, and can use this knowledge to provide accurate and informative responses.
+Additionally, Assistant is able to generate its own text based on the input it receives, allowing it to engage in discussions and provide explanations and descriptions to help with finding a users lost/stolen bike.
 
 Assistant has access to the following tools:
 
@@ -170,5 +171,3 @@ agent_executor = AgentExecutor.from_agent_and_tools(
 while True:
     user_input = input("User: ")
     agent_executor.run(user_input)
-    if user_input == "bye":
-        break
