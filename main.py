@@ -1,18 +1,21 @@
-from langchain.tools import DuckDuckGoSearchRun, Tool
+from langchain.tools import Tool
 import os
 from langchain.chains.conversation.memory import ConversationBufferWindowMemory
 from langchain.llms import AzureOpenAI
-from langchain.agents import Tool, AgentExecutor, LLMSingleActionAgent, AgentOutputParser
+from langchain.agents import Tool, AgentExecutor, LLMSingleActionAgent, AgentOutputParser, create_json_agent
 import openai
+from langchain.agents.agent_toolkits import JsonToolkit
 from typing import List, Union
 from langchain.prompts import StringPromptTemplate
 from langchain.schema import AgentAction, AgentFinish
 import re
 from langchain import LLMChain
-from langchain.chains import LLMSummarizationCheckerChain
-from langchain.callbacks import StdOutCallbackHandler
+from langchain.tools.json.tool import JsonSpec
 import requests
 from dotenv import load_dotenv
+import pinecone
+from sentence_transformers import SentenceTransformer, util
+from PIL import Image
 
 load_dotenv()
 
@@ -23,40 +26,44 @@ openai.api_version = '2023-03-15-preview'
 os.environ["LANGCHAIN_TRACING_V2"] = "true"
 os.environ["LANGCHAIN_ENDPOINT"] = "https://api.langchain.plus"
 os.getenv('LANGCHAIN_API_KEY')
+os.getenv('PINECONE_API_KEY')
+os.getenv('PINECONE_ENV')
 
 llm = AzureOpenAI(deployment_name="davinci",
                   model_name="text-davinci-003", temperature=0)
 
-
-def call_bike_index_api(ip_address):
-    url = f"https://bikeindex.org:443/api/v3/search?page=1&per_page=3&location={ip_address}&distance=10&stolenness=stolen"
-    response = requests.get(url)
-
-    if response.status_code == 200:
-        return response.json()
-    else:
-        return None
-
-
-def get_user_ip_address(a):
-    try:
-        response = requests.get('https://api.ipify.org?format=json')
-        data = response.json()
-        return data['ip']
-    except requests.RequestException:
-        return None
+def get_bike_data(a):
+    model = SentenceTransformer('clip-ViT-B-32')
+    img_emb = model.encode(Image.open(f'data/images/large_IMG_1704.jpeg')).tolist()
+    pinecone.init(
+    api_key=os.getenv('PINECONE_API_KEY'),
+    environment=os.getenv('PINECONE_ENV')
+    )
+    vdb = pinecone.Index("cycle-saviours")
+    result = vdb.query(
+        vector=img_emb,
+        top_k=3,
+        include_values=False,
+        include_metadata=True
+    )
+    image_links = []
+    
+    matches = result.get('matches', [])
+    for match in matches:
+        metadata = match.get('metadata', {})
+        image_link = metadata.get('image_link')
+        
+        if image_link:
+            image_links.append(image_link)
+    
+    return image_links
 
 
 tools = [
     Tool(
         name="Search Bike Index",
-        func=call_bike_index_api,
-        description="Useful for searching for stolen bikes in a particular area. The input to this tool should be the user's IP address",
-    ),
-    Tool(
-        name="Get User IP Address",
-        func=get_user_ip_address,
-        description="Useful for getting the user's IP address.",
+        func=get_bike_data,
+        description="Useful when you want to return a list of bike images that match the image uploaded by the user"
     )
 ]
 
