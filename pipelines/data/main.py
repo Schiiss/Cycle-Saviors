@@ -1,4 +1,8 @@
-"""Extract data from online marketplaces"""
+"""Extract data from online marketplaces
+
+Resources:
+https://bikeindex.org/documentation/api_v3
+"""
 from tqdm import tqdm
 import yaml
 import structlog

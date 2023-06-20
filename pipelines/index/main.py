@@ -1,9 +1,16 @@
-"""Upsert data to Pinecone index"""
+"""Upsert data to Pinecone index
+
+Resources:
+https://github.com/pinecone-io/examples/blob/master/search/hybrid-search/ecommerce-search/ecommerce-search.ipynb
+https://huggingface.co/sentence-transformers/clip-ViT-B-32
+https://docs.pinecone.io/docs/image-similarity-search
+"""
 import yaml
 import structlog
 from src.pinecone_utils import PineconeTools
 import pinecone
 from sentence_transformers import SentenceTransformer
+import os
 
 logger = structlog.getLogger(__name__)
 
@@ -11,8 +18,8 @@ logger = structlog.getLogger(__name__)
 with open("config.yaml", "r") as config_file:
     config_data = yaml.safe_load(config_file)
 
-PINECONE_API_KEY = '75c794bc-4feb-4358-8ab8-5ccccb91dc88' 
-PINECONE_ENV = 'us-east-1-aws'
+PINECONE_API_KEY = os.getenv('PINECONE_API_KEY')
+PINECONE_ENV = os.getenv('PINECONE_ENV')
 
 pinecone.init(
     api_key=PINECONE_API_KEY,

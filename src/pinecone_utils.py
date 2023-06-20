@@ -10,7 +10,7 @@ logger = structlog.getLogger(__name__)
 class PineconeTools:
     """Class to upsert data to Pinecone"""
 
-    def __init__(self, index_name, embedding_model):
+    def __init__(self):
         """instantiate"""
 
     def load_metadata(self, filepath):
@@ -48,7 +48,7 @@ class PineconeTools:
             })    
             
             i += 1
-            if i % 1000 == 0:
+            if i % 250 == 0:
                 index.upsert(upserts)
                 logger.info(f'Upsert count: {i}')
                 upserts = []
