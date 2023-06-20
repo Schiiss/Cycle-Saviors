@@ -1,0 +1,6 @@
+bike-index:
+  base_url: https://bikeindex.org:443/api/v3/search?page={}&per_page=100&location={}&distance=100&stolenness=proximity
+  cities: ['calgary']
+  max_pages: 50
+  output_json: '../../data/bike-index.json'
+  output_images: '../../data/bike-index-images'

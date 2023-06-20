@@ -1,9 +1,0 @@
-kijiji:
-  base_url: 'https://www.kijiji.ca/b-{}/{}/page-{}/{}'
-  cities: {
-    'calgary': {'mountain-bike': 'c647l1700199', 'road-bike': 'c648l1700199'}, 
-    'gta-greater-toronto-area': {'mountain-bike': 'c647l1700272', 'road-bike': 'c648l1700272'}
-    }
-  max_pages: 1
-  output_csv: '../../data/kijiji-scrape.csv'
-  output_images: '../../data/images/{}.jpg'

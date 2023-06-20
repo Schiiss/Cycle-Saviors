@@ -1,0 +1,9 @@
+pinecone:
+  data: {
+    'bike-index':{
+      json_data: '../../data/bike-index.json',
+      image_data: '../../data/bike-index-images'
+    }}
+  index_name: 'cycle-saviours'
+  embedding_model_name: 'clip-ViT-B-32'
+
