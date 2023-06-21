@@ -100,75 +100,46 @@ llm = AzureOpenAI(deployment_name="davinci",
                   model_name="text-davinci-003", temperature=0)
 
 
-def get_bike_data(a):
-    model = SentenceTransformer('clip-ViT-B-32')
-    img_emb = model.encode(Image.open(
-        f'data/images/large_IMG_1704.jpeg')).tolist()
-    pinecone.init(
-        api_key=os.getenv('PINECONE_API_KEY'),
-        environment=os.getenv('PINECONE_ENV')
-    )
-    vdb = pinecone.Index("cycle-saviours")
-    result = vdb.query(
-        vector=img_emb,
-        top_k=3,
-        include_values=False,
-        include_metadata=True
-    )
-    image_links = []
-
-    matches = result.get('matches', [])
-    for match in matches:
-        metadata = match.get('metadata', {})
-        image_link = metadata.get('image_link')
-
-        if image_link:
-            image_links.append(image_link)
-
-    return image_links
-
-
 def get_filtered_results(location):
     model = SentenceTransformer('clip-ViT-B-32')
-    img_emb = model.encode(Image.open(
-        f'data/images/large_IMG_1704.jpeg')).tolist()
-    pinecone.init(
-        api_key=os.getenv('PINECONE_API_KEY'),
-        environment=os.getenv('PINECONE_ENV')
-    )
-    vdb = pinecone.Index("cycle-saviours")
-    result = vdb.query(
-        vector=img_emb,
-        top_k=3,
-        include_values=False,
-        filter={
-            "ad_location": {"$eq": location}
-        },
-        include_metadata=True
-    )
     image_links = []
 
-    matches = result.get('matches', [])
-    for match in matches:
-        metadata = match.get('metadata', {})
-        image_link = metadata.get('image_link')
+    for file_name in os.listdir('data/images'):
+        if file_name.endswith(('.jpg', '.png', '.jpeg')):
+            file_path = os.path.join('data/images', file_name)
+            img_emb = model.encode(Image.open(file_path)).tolist()
 
-        if image_link:
-            image_links.append(image_link)
+            pinecone.init(
+                api_key=os.getenv('PINECONE_API_KEY'),
+                environment=os.getenv('PINECONE_ENV')
+            )
+            vdb = pinecone.Index("cycle-saviours")
+            result = vdb.query(
+                vector=img_emb,
+                top_k=3,
+                include_values=False,
+                filter={
+                    "ad_location": {"$eq": location}
+                },
+                include_metadata=True
+            )
+
+            matches = result.get('matches', [])
+            for match in matches:
+                metadata = match.get('metadata', {})
+                image_link = metadata.get('image_link')
+
+                if image_link:
+                    image_links.append(image_link)
 
     return image_links
 
 
 tools = [
     Tool(
-        name="Search Bike Index",
-        func=get_bike_data,
-        description="Useful when you want to return a list of bike images that match the image uploaded by the user"
-    ),
-    Tool(
         name="Search Bike Index by Location",
         func=get_filtered_results,
-        description="Useful when you want to return a list of bike images and filter by a location. The input is the location of the bike theft. For example, 'calgary'"
+        description="Useful when you want to return a list of bike images and filter by a location. The input is the location of the bike theft. For example, 'calgary'. It should always be provide in lower case"
     )
 ]
 
@@ -287,23 +258,23 @@ class ChatBot:
     def ask_location(self):
         self.location = st.text_input("AI: Where was it stolen?")
         return self.location
-    
+
     def save_uploaded_file(self, uploaded_file):
-        UPLOAD_DIR = "data/images" 
+        UPLOAD_DIR = "data/images"
         if not os.path.exists(UPLOAD_DIR):
             os.makedirs(UPLOAD_DIR)
-        
+
         file_path = os.path.join(UPLOAD_DIR, uploaded_file.name)
-        
+
         with open(file_path, "wb") as f:
             f.write(uploaded_file.getbuffer())
-        
+
         return file_path
-    
+
     def ask_file(self):
         uploaded_file = st.file_uploader("AI: Please upload an image of your bike (optional)",
-                                        type=["jpg", "jpeg", "png"])
-        
+                                         type=["jpg", "jpeg", "png"])
+
         if uploaded_file is not None:
             file_path = self.save_uploaded_file(uploaded_file)
             st.success("File saved successfully.")
