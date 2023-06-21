@@ -287,12 +287,36 @@ class ChatBot:
     def ask_location(self):
         self.location = st.text_input("AI: Where was it stolen?")
         return self.location
+    
+    def save_uploaded_file(self, uploaded_file):
+        UPLOAD_DIR = "data/images" 
+        if not os.path.exists(UPLOAD_DIR):
+            os.makedirs(UPLOAD_DIR)
+        
+        file_path = os.path.join(UPLOAD_DIR, uploaded_file.name)
+        
+        with open(file_path, "wb") as f:
+            f.write(uploaded_file.getbuffer())
+        
+        return file_path
+    
+    def ask_file(self):
+        uploaded_file = st.file_uploader("AI: Please upload an image of your bike (optional)",
+                                        type=["jpg", "jpeg", "png"])
+        
+        if uploaded_file is not None:
+            file_path = self.save_uploaded_file(uploaded_file)
+            st.success("File saved successfully.")
+            return file_path
+        else:
+            return None
 
 
 with col2:
     chatbot = ChatBot()
     color = chatbot.ask_color()
     location = chatbot.ask_location()
+    file = chatbot.ask_file()
     user_input = st.text_input('Start a chat with our assistant!',
                                key='input',
                                label_visibility='visible',
