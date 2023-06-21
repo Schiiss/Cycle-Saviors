@@ -1,8 +1,33 @@
 """Cycle Saviour Home App Page"""
 import streamlit as st
 from streamlit_chat import message
+from sentence_transformers import SentenceTransformer
+import pinecone
+import os
 
 st.set_page_config(layout='wide')
+
+# initialize hugging face models once with cache
+@st.cache_resource
+def load_model(model_name):
+    return SentenceTransformer(model_name)
+
+model = load_model('clip-ViT-B-32')
+
+# initialize pinecone index once with cache
+@st.cache_resource
+def load_pinecone(index_name):
+    PINECONE_API_KEY = os.getenv('PINECONE_API_KEY')
+    PINECONE_ENV = os.getenv('PINECONE_ENV')
+
+    pinecone.init(
+        api_key=PINECONE_API_KEY,
+        environment=PINECONE_ENV
+    )
+
+    return pinecone.Index(index_name)
+
+index = load_pinecone('cycle-saviours')
 
 # set the title
 st.markdown("<h1>Find My Stolen Bike!</h1>", unsafe_allow_html=True)
