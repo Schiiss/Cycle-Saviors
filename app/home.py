@@ -28,18 +28,13 @@ from azure.storage.blob import BlobServiceClient, BlobClient
 st.set_page_config(layout='wide')
 
 # initialize hugging face models once with cache
-
-
 @st.cache_resource
 def load_model(model_name):
     return SentenceTransformer(model_name)
 
-
 model = load_model('clip-ViT-B-32')
 
 # initialize pinecone index once with cache
-
-
 @st.cache_resource
 def load_pinecone(index_name):
     PINECONE_API_KEY = os.getenv('PINECONE_API_KEY')
@@ -51,7 +46,6 @@ def load_pinecone(index_name):
     )
 
     return pinecone.Index(index_name)
-
 
 index = load_pinecone('cycle-saviours')
 
@@ -104,9 +98,7 @@ os.getenv("AZURE_COGS_REGION")
 llm = AzureOpenAI(deployment_name="davinci",
                   model_name="text-davinci-003", temperature=0)
 
-
-def get_filtered_results(location):
-    model = SentenceTransformer('clip-ViT-B-32')
+def get_filtered_results(location, model, index):
     image_links = []
 
     for file_name in os.listdir('data/images'):
@@ -114,12 +106,7 @@ def get_filtered_results(location):
             file_path = os.path.join('data/images', file_name)
             img_emb = model.encode(Image.open(file_path)).tolist()
 
-            pinecone.init(
-                api_key=os.getenv('PINECONE_API_KEY'),
-                environment=os.getenv('PINECONE_ENV')
-            )
-            vdb = pinecone.Index("cycle-saviours")
-            result = vdb.query(
+            result = index.query(
                 vector=img_emb,
                 top_k=3,
                 include_values=False,
@@ -258,11 +245,6 @@ agent = initialize_agent(
     agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
     verbose=True,
 )
-
-
-memory = ConversationBufferMemory(memory_key="chat_history")
-
-conversation_agent = initialize_agent(tools, llm, agent=AgentType.CONVERSATIONAL_REACT_DESCRIPTION, verbose=True, memory=memory)
 
 
 class ChatBot:
