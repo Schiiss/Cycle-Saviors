@@ -8,7 +8,7 @@ from langchain.tools import Tool
 import os
 from langchain.chains.conversation.memory import ConversationBufferWindowMemory
 from langchain.llms import AzureOpenAI
-from langchain.agents import Tool, AgentExecutor, LLMSingleActionAgent, AgentOutputParser, create_json_agent
+from langchain.agents import Tool, AgentExecutor, LLMSingleActionAgent, AgentOutputParser, initialize_agent, AgentType
 import openai
 from langchain.agents.agent_toolkits import JsonToolkit
 from typing import List, Union
@@ -22,6 +22,8 @@ from dotenv import load_dotenv
 import pinecone
 from sentence_transformers import SentenceTransformer, util
 from PIL import Image
+from langchain.agents.agent_toolkits import AzureCognitiveServicesToolkit
+from azure.storage.blob import BlobServiceClient, BlobClient
 
 st.set_page_config(layout='wide')
 
@@ -95,6 +97,9 @@ os.environ["LANGCHAIN_ENDPOINT"] = "https://api.langchain.plus"
 os.getenv('LANGCHAIN_API_KEY')
 os.getenv('PINECONE_API_KEY')
 os.getenv('PINECONE_ENV')
+os.getenv("AZURE_COGS_KEY")
+os.getenv("AZURE_COGS_ENDPOINT")
+os.getenv("AZURE_COGS_REGION")
 
 llm = AzureOpenAI(deployment_name="davinci",
                   model_name="text-davinci-003", temperature=0)
@@ -245,6 +250,15 @@ agent_executor = AgentExecutor.from_agent_and_tools(
     memory=memory
 )
 
+toolkit = AzureCognitiveServicesToolkit()
+
+agent = initialize_agent(
+    tools=toolkit.get_tools(),
+    llm=llm,
+    agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
+    verbose=True,
+)
+
 
 class ChatBot:
     def __init__(self):
@@ -269,7 +283,20 @@ class ChatBot:
         with open(file_path, "wb") as f:
             f.write(uploaded_file.getbuffer())
 
+        # Upload the file to Azure Blob Storage
+        account_name = "pineconehackathon"
+        account_key = os.getenv("STORAGE_ACCOUNT_KEY")
+        container_name = "container"
+        blob_name = uploaded_file.name
+
+        blob_service_client = BlobServiceClient(account_url=f"https://{account_name}.blob.core.windows.net/", credential=account_key)
+        blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
+
+        with open(file_path, "rb") as data:
+            blob_client.upload_blob(data, overwrite=True)
+
         return file_path
+
 
     def ask_file(self):
         uploaded_file = st.file_uploader("AI: Please upload an image of your bike (optional)",
@@ -300,8 +327,12 @@ with col2:
         st.session_state.conversation_history.append((user_input, result))
         st.session_state.ai_response_history.append(result)
         if color and location:
+            agent.run(
+                "what color is this bike?"
+                "https://pineconehackathon.blob.core.windows.net/container/large_IMG_1704.jpeg"
+            )
             output = agent_executor.run(
-                f"The user has had the following bike stolen from them, please help them find it: color: {color}, location: {location}. Ensure to provide them the links to the ads.")
+                f"The user has had the following bike stolen from them, please help them find it: color: {color}, location: {location}. Once you have the links for the ad STOP & provide them the links to the ads.")
             st.session_state.conversation_history.append(("AI:", output))
             st.session_state.ai_response_history.append(output)
 
