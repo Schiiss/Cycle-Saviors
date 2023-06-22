@@ -26,43 +26,37 @@ from langchain.agents.agent_toolkits import AzureCognitiveServicesToolkit
 from azure.storage.blob import BlobServiceClient, BlobClient
 from langchain.tools import StructuredTool
 import io
+from transformers import AutoProcessor, BlipForQuestionAnswering
+from PIL import Image
+import datetime
 
 st.set_page_config(layout='wide')
 
-# initialize hugging face models once with cache
-
-
 @st.cache_resource
-def load_model(model_name):
-    return SentenceTransformer(model_name)
+def load_models():
+    image_text_model = BlipForQuestionAnswering.from_pretrained("Salesforce/blip-vqa-base")
+    image_text_processor = AutoProcessor.from_pretrained("Salesforce/blip-vqa-base")
+    image_embedding_model = SentenceTransformer("clip-ViT-B-32")
+    st.success('All models initialized and cached!!!')
+    return image_text_processor, image_text_model, image_embedding_model
 
-
-model = load_model('clip-ViT-B-32')
+image_text_processor, image_text_model, image_embedding_model = load_models()
 
 # initialize pinecone index once with cache
-
-
 @st.cache_resource
 def load_pinecone(index_name):
     PINECONE_API_KEY = os.getenv('PINECONE_API_KEY')
     PINECONE_ENV = os.getenv('PINECONE_ENV')
-
     pinecone.init(
         api_key=PINECONE_API_KEY,
         environment=PINECONE_ENV
     )
-
     return pinecone.Index(index_name)
-
 
 index = load_pinecone('cycle-saviours')
 
 # set the title
 st.markdown("<h1>Find My Stolen Bike!</h1>", unsafe_allow_html=True)
-
-# state variables to hold chat history
-if 'user_query_history' not in st.session_state:
-    st.session_state['user_query_history'] = []
 
 if 'conversation_history' not in st.session_state:
     st.session_state['conversation_history'] = []
@@ -75,14 +69,19 @@ col1, col2 = st.columns([10, 10])
 
 # this column holds the results once the assistant finds them
 with col1:
-    # this will popup only on second and onward user input but that is okay in our case
-    if st.session_state['user_query_history']:
-
-        # this will ideally be the image, links, title description of add, etc.
-        html_placeholder = '<html>'
-
-        for i in range(0, 5):
-            html_placeholder += '<div style="background-color: rgba(213, 238, 247, 0.5); border-radius: 10px; padding: 10px; margin-bottom: 20px;><table style="border: none;background-color: lightblue; border-radius: 10px;"><tr style="border: none;"><h3><a href="https://google.com" style="text-decoration:none;" target="_blank">"Placeholder"</a></h3></tr><tr style="border: none;">"Placeholder for ad text"<br><br></tr><tr style="border: none;"><strong>"More Placeholder space"</strong><br></tr><br></table></div>'
+    if pinecone_output:
+        html_placeholder = '<html><h6>Ads found online that match your image and description</h6>'
+        for data in pinecone_output:
+            listed_date = str(data['metadata']['list_date']).split('.')[0]
+            html_placeholder += '<div style="background-color: rgba(213, 238, 247, 0.5);' \
+                'border-radius: 10px; padding: 10px; margin-bottom: 20px;><table style="border: none;' \
+                'background-color: lightblue; border-radius: 10px;">' \
+            html_placeholder += '<tr style="border: none;">' \
+                f'<h3><a href={data["metadata"]["ad_link"]} style="text-decoration:none;" target="_blank">{data["metadata"]["ad_title"]}</a></h3>' \
+                f'</tr><tr style="border: none;"><strong>Ad Source: </strong>{data["metadata"]["source"]} <br>' \
+                f'<strong>Ad Location: </strong>{data["metadata"]["ad_location"]} <br>' \
+                f'<strong>Ad List Date: </strong>{listed_date[0:4]+"-"+listed_date[4:6]+"-"+listed_date[6:]}<br>' \
+                f'<br></tr><tr style="border: none;"><img src={data["metadata"]["image_link"]} alt=Ad Id: {data["metadata"]["source_id"]}></tr><br></table></div>'
 
         html_placeholder += '</html>'
 
@@ -110,7 +109,6 @@ llm = AzureOpenAI(deployment_name="davinci",
 
 def get_filtered_results(location: str, color: str, bike_model: str):
     """The input is the location of the bike theft and the color of the bike. example: 'calgary', 'Red', 'Trek'"""
-    model = SentenceTransformer('clip-ViT-B-32')
     metadata_list = []
     account_name = "pineconehackathon"
     account_key = os.getenv("STORAGE_ACCOUNT_KEY")
@@ -127,14 +125,9 @@ def get_filtered_results(location: str, color: str, bike_model: str):
             with io.BytesIO() as f:
                 blob_data.readinto(f)
                 f.seek(0)
-                img_emb = model.encode(Image.open(f)).tolist()
+                img_emb = image_embedding_model.encode(Image.open(f)).tolist()
 
-            pinecone.init(
-                api_key=os.getenv('PINECONE_API_KEY'),
-                environment=os.getenv('PINECONE_ENV')
-            )
-            vdb = pinecone.Index("cycle-saviours")
-            result = vdb.query(
+            result = index.query(
                 vector=img_emb,
                 top_k=3,
                 include_values=False,
