@@ -2,3 +2,10 @@ streamlit==1.23.1
 streamlit-chat==0.0.2.2
 pinecone-client==2.2.2
 sentence-transformers==2.2.2
+azure-storage-blob==12.16.0
+azure-ai-formrecognizer==3.2.1
+azure-cognitiveservices-speech==1.29.0
+azure-ai-vision==0.11.1b1
+sentence-transformers==2.2.2
+openai==0.27.0
+langchain==0.0.188
