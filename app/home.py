@@ -28,13 +28,18 @@ from azure.storage.blob import BlobServiceClient, BlobClient
 st.set_page_config(layout='wide')
 
 # initialize hugging face models once with cache
+
+
 @st.cache_resource
 def load_model(model_name):
     return SentenceTransformer(model_name)
 
+
 model = load_model('clip-ViT-B-32')
 
 # initialize pinecone index once with cache
+
+
 @st.cache_resource
 def load_pinecone(index_name):
     PINECONE_API_KEY = os.getenv('PINECONE_API_KEY')
@@ -46,6 +51,7 @@ def load_pinecone(index_name):
     )
 
     return pinecone.Index(index_name)
+
 
 index = load_pinecone('cycle-saviours')
 
@@ -63,7 +69,7 @@ if 'ai_response_history' not in st.session_state:
     st.session_state['ai_response_history'] = []
 
 # split into columns for chat and responses
-col1, col2 = st.columns([0.7, 0.3])
+col1, col2 = st.columns([10, 10])
 
 # this column holds the results once the assistant finds them
 with col1:
@@ -98,7 +104,9 @@ os.getenv("AZURE_COGS_REGION")
 llm = AzureOpenAI(deployment_name="davinci",
                   model_name="text-davinci-003", temperature=0)
 
-def get_filtered_results(location, model, index):
+
+def get_filtered_results(location):
+    model = SentenceTransformer('clip-ViT-B-32')
     image_links = []
 
     for file_name in os.listdir('data/images'):
@@ -106,7 +114,12 @@ def get_filtered_results(location, model, index):
             file_path = os.path.join('data/images', file_name)
             img_emb = model.encode(Image.open(file_path)).tolist()
 
-            result = index.query(
+            pinecone.init(
+                api_key=os.getenv('PINECONE_API_KEY'),
+                environment=os.getenv('PINECONE_ENV')
+            )
+            vdb = pinecone.Index("cycle-saviours")
+            result = vdb.query(
                 vector=img_emb,
                 top_k=3,
                 include_values=False,
@@ -246,6 +259,11 @@ agent = initialize_agent(
     verbose=True,
 )
 
+memory = ConversationBufferMemory(memory_key="chat_history")
+
+conversation_agent = initialize_agent(
+    tools, llm, agent=AgentType.CONVERSATIONAL_REACT_DESCRIPTION, verbose=True, memory=memory)
+
 
 class ChatBot:
     def __init__(self):
@@ -276,14 +294,15 @@ class ChatBot:
         container_name = "container"
         blob_name = uploaded_file.name
 
-        blob_service_client = BlobServiceClient(account_url=f"https://{account_name}.blob.core.windows.net/", credential=account_key)
-        blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
+        blob_service_client = BlobServiceClient(
+            account_url=f"https://{account_name}.blob.core.windows.net/", credential=account_key)
+        blob_client = blob_service_client.get_blob_client(
+            container=container_name, blob=blob_name)
 
         with open(file_path, "rb") as data:
             blob_client.upload_blob(data, overwrite=True)
 
         return file_path
-
 
     def ask_file(self):
         uploaded_file = st.file_uploader("AI: Please upload an image of your bike (REQUIRED)",
@@ -295,6 +314,7 @@ class ChatBot:
             return file_path
         else:
             return None
+
 
 with col2:
     chatbot = ChatBot()
@@ -319,4 +339,3 @@ with col2:
             st.text("AI: " + response)
         else:
             st.text("User: " + query)
-
