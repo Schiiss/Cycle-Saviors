@@ -88,6 +88,7 @@ with col1:
 
 load_dotenv()
 
+"""
 openai.api_key = os.getenv('OPENAI_API_KEY')
 openai.api_base = os.getenv('OPENAI_API_ENDPOINT')
 openai.api_type = 'azure'
@@ -100,6 +101,20 @@ os.getenv('PINECONE_ENV')
 os.getenv("AZURE_COGS_KEY")
 os.getenv("AZURE_COGS_ENDPOINT")
 os.getenv("AZURE_COGS_REGION")
+"""
+openai.api_key = st.secrets["OPENAI_API_KEY"]
+openai.api_base = st.secrets["OPENAI_API_ENDPOINT"]
+openai.api_type = 'azure'
+openai.api_version = '2023-03-15-preview'
+os.environ["LANGCHAIN_TRACING_V2"] = "true"
+os.environ["LANGCHAIN_ENDPOINT"] = "https://api.langchain.plus"
+os.environ['LANGCHAIN_API_KEY'] = st.secrets["LANGCHAIN_API_KEY"]
+os.environ['PINECONE_API_KEY'] = st.secrets["PINECONE_API_KEY"]
+os.environ['PINECONE_ENV'] = st.secrets["PINECONE_ENV"]
+os.environ["AZURE_COGS_KEY"]  = st.secrets["AZURE_COGS_KEY"]
+os.environ["AZURE_COGS_ENDPOINT"] = st.secrets["AZURE_COGS_ENDPOINT"]
+os.environ["AZURE_COGS_REGION"] = st.secrets["AZURE_COGS_REGION"]
+
 
 llm = AzureOpenAI(deployment_name="davinci",
                   model_name="text-davinci-003", temperature=0)
@@ -290,7 +305,8 @@ class ChatBot:
 
         # Upload the file to Azure Blob Storage
         account_name = "pineconehackathon"
-        account_key = os.getenv("STORAGE_ACCOUNT_KEY")
+        #account_key = os.getenv("STORAGE_ACCOUNT_KEY")
+        account_key = st.secrets["STORAGE_ACCOUNT_KEY"]
         container_name = "container"
         blob_name = uploaded_file.name
 
