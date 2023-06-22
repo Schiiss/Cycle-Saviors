@@ -6,7 +6,7 @@ import pinecone
 import os
 from langchain.tools import Tool
 import os
-from langchain.chains.conversation.memory import ConversationBufferWindowMemory
+from langchain.chains.conversation.memory import ConversationBufferWindowMemory, ConversationBufferMemory
 from langchain.llms import AzureOpenAI
 from langchain.agents import Tool, AgentExecutor, LLMSingleActionAgent, AgentOutputParser, initialize_agent, AgentType
 import openai
@@ -260,6 +260,11 @@ agent = initialize_agent(
 )
 
 
+memory = ConversationBufferMemory(memory_key="chat_history")
+
+conversation_agent = initialize_agent(tools, llm, agent=AgentType.CONVERSATIONAL_REACT_DESCRIPTION, verbose=True, memory=memory)
+
+
 class ChatBot:
     def __init__(self):
         self.color = None
@@ -299,7 +304,7 @@ class ChatBot:
 
 
     def ask_file(self):
-        uploaded_file = st.file_uploader("AI: Please upload an image of your bike (optional)",
+        uploaded_file = st.file_uploader("AI: Please upload an image of your bike (REQUIRED)",
                                          type=["jpg", "jpeg", "png"])
 
         if uploaded_file is not None:
@@ -309,35 +314,27 @@ class ChatBot:
         else:
             return None
 
-
 with col2:
     chatbot = ChatBot()
-    color = chatbot.ask_color()
-    location = chatbot.ask_location()
     file = chatbot.ask_file()
-    user_input = st.text_input('Start a chat with our assistant!',
-                               key='input',
-                               label_visibility='visible',
-                               placeholder='My bike was stolen, help me find it!')
-
-    if user_input:
-        result = "User is looking for a bike with color: " + \
-            color + " and location: " + location
-        st.session_state.user_query_history.append(user_input)
-        st.session_state.conversation_history.append((user_input, result))
-        st.session_state.ai_response_history.append(result)
-        if color and location:
-            agent.run(
-                "what color is this bike?"
-                "https://pineconehackathon.blob.core.windows.net/container/large_IMG_1704.jpeg"
-            )
-            output = agent_executor.run(
-                f"The user has had the following bike stolen from them, please help them find it: color: {color}, location: {location}. Once you have the links for the ad STOP & provide them the links to the ads.")
+    if file:
+        bike_image_analysis = agent.run(
+            "what color is this bike?"
+            "https://pineconehackathon.blob.core.windows.net/container/large_IMG_1704.jpeg"
+        )
+        st.text(f"AI: Does this sound like your bike? {bike_image_analysis}")
+        user_response = st.text_input('User Response:')
+        if user_response.lower() == 'yes':
+            output = conversation_agent.run(
+                f"The user has had the following bike stolen from them, please help them find it: {bike_image_analysis}. Once you have the links for the ad STOP & provide them the links to the ads.")
             st.session_state.conversation_history.append(("AI:", output))
             st.session_state.ai_response_history.append(output)
+    else:
+        st.text("AI: Please provide an image of your bike.")
 
     for i, (query, response) in enumerate(st.session_state.conversation_history):
         if query.startswith("AI:"):
             st.text("AI: " + response)
         else:
             st.text("User: " + query)
+
