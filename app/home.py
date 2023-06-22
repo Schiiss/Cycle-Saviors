@@ -24,6 +24,8 @@ from sentence_transformers import SentenceTransformer, util
 from PIL import Image
 from langchain.agents.agent_toolkits import AzureCognitiveServicesToolkit
 from azure.storage.blob import BlobServiceClient, BlobClient
+from langchain.tools import StructuredTool
+import io
 
 st.set_page_config(layout='wide')
 
@@ -106,14 +108,26 @@ llm = AzureOpenAI(deployment_name="davinci",
                   model_name="text-davinci-003", temperature=0)
 
 
-def get_filtered_results(location):
+def get_filtered_results(location: str, color: str, bike_model: str):
+    """The input is the location of the bike theft and the color of the bike. example: 'calgary', 'Red', 'Trek'"""
     model = SentenceTransformer('clip-ViT-B-32')
-    image_links = []
+    metadata_list = []
+    account_name = "pineconehackathon"
+    account_key = os.getenv("STORAGE_ACCOUNT_KEY")
+    container_name = "container"
 
-    for file_name in os.listdir('data/images'):
-        if file_name.endswith(('.jpg', '.png', '.jpeg')):
-            file_path = os.path.join('data/images', file_name)
-            img_emb = model.encode(Image.open(file_path)).tolist()
+    blob_service_client = BlobServiceClient(account_url=f"https://{account_name}.blob.core.windows.net", credential=account_key)
+    container_client = blob_service_client.get_container_client(container_name)
+
+    for blob in container_client.list_blobs():
+        if blob.name.endswith(('.jpg', '.png', '.jpeg')):
+            blob_client = container_client.get_blob_client(blob.name)
+            blob_data = blob_client.download_blob()
+
+            with io.BytesIO() as f:
+                blob_data.readinto(f)
+                f.seek(0)
+                img_emb = model.encode(Image.open(f)).tolist()
 
             pinecone.init(
                 api_key=os.getenv('PINECONE_API_KEY'),
@@ -133,19 +147,18 @@ def get_filtered_results(location):
             matches = result.get('matches', [])
             for match in matches:
                 metadata = match.get('metadata', {})
-                image_link = metadata.get('image_link')
+                metadata_list.append(metadata)
 
-                if image_link:
-                    image_links.append(image_link)
+    return metadata_list
 
-    return image_links
 
+structured_tool = StructuredTool.from_function(get_filtered_results)
 
 tools = [
     Tool(
         name="Search Bike Index by Location",
         func=get_filtered_results,
-        description="Useful when you want to return a list of bike images and filter by a location. The input is the location of the bike theft. For example, 'calgary'. It should always be provide in lower case"
+        description="Useful when you want to return a list of bike images and filter by location and color. The input is the location of the bike theft and the color of the bike. example: 'calgary', 'red'",
     )
 ]
 
@@ -263,7 +276,7 @@ agent = initialize_agent(
 memory = ConversationBufferMemory(memory_key="chat_history")
 
 conversation_agent = initialize_agent(
-    tools, llm, agent=AgentType.CONVERSATIONAL_REACT_DESCRIPTION, verbose=True, memory=memory)
+    [structured_tool], llm, agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION, verbose=True, memory=memory)
 
 
 class ChatBot:
@@ -306,7 +319,7 @@ class ChatBot:
         return file_path
 
     def ask_file(self):
-        uploaded_file = st.file_uploader("AI: Please upload an image of your bike (REQUIRED)",
+        uploaded_file = st.file_uploader("Please upload an image of your bike (REQUIRED)",
                                          type=["jpg", "jpeg", "png"])
 
         if uploaded_file is not None:
@@ -320,20 +333,22 @@ class ChatBot:
 with col2:
     chatbot = ChatBot()
     file = chatbot.ask_file()
-    if file:
+    city = st.selectbox('Please select a city (REQUIRED)', ['SELECT CITY', 'calgary', 'edmonton', 'vancouver'])
+    if file and city:
         bike_image_analysis = agent.run(
-            "what color is this bike?"
+            "what color is this bike? what model is this bike?"
             "https://pineconehackathon.blob.core.windows.net/container/large_IMG_1704.jpeg"
         )
         st.text(f"AI: Does this sound like your bike? {bike_image_analysis}")
         user_response = st.text_input('User Response:')
         if user_response.lower() == 'yes':
             output = conversation_agent.run(
-                f"The user has had the following bike stolen from them, please help them find it: {bike_image_analysis}. Once you have the links for the ad STOP & provide them the links to the ads.")
+                f"The user has had their bike stolen from them, please help them find it. DESCRIPTION: {bike_image_analysis} LOCATION: {city}. Once you have the links for the ad STOP & provide them the links to the ads.")
+            pinecone_output = get_filtered_results(city, "black", "Trek")
             st.session_state.conversation_history.append(("AI:", output))
             st.session_state.ai_response_history.append(output)
     else:
-        st.text("AI: Please provide an image of your bike.")
+        st.text("AI: Please provide an image of your bike and the city it was last seen in.")
 
     for i, (query, response) in enumerate(st.session_state.conversation_history):
         if query.startswith("AI:"):
