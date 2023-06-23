@@ -1,6 +1,7 @@
 """Cycle Saviour Home App Page"""
 import streamlit as st
 from sentence_transformers import SentenceTransformer
+from streamlit_chat import message
 import pinecone
 import os
 from langchain.tools import Tool, StructuredTool
@@ -14,6 +15,7 @@ from langchain import LLMChain, OpenAI
 from dotenv import load_dotenv
 from PIL import Image
 from transformers import AutoProcessor, BlipForQuestionAnswering
+from langchain.chains import ConversationChain
 
 ####################################################
 # BACKGROUND CONFIGURATIONS AND CACHE
@@ -254,6 +256,21 @@ class ChatBot:
             return file_path
         else:
             return None
+        
+conversation = ConversationChain(
+    llm=llm,
+    memory=ConversationBufferMemory()
+)
+
+if "generated" not in st.session_state:
+    st.session_state["generated"] = []
+
+if "past" not in st.session_state:
+    st.session_state["past"] = []
+
+def get_text():
+    input_text = st.text_input("You: ", "Can you help me find my stolen bike?", key="input")
+    return input_text
 
 with col2:
     chatbot = ChatBot()
@@ -289,14 +306,28 @@ with col2:
                     html_placeholder += '</html>'
 
                     st.markdown(html_placeholder, unsafe_allow_html=True)
-                    
-            st.session_state.conversation_history.append(("AI:", output))
-            st.session_state.ai_response_history.append(output)
-    else:
-        st.text("AI: Please provide an image of your bike and the city it was last seen in.")
+if "generated" not in st.session_state:
+    st.session_state.generated = []
+if "past" not in st.session_state:
+    st.session_state.past = []
 
-    for i, (query, response) in enumerate(st.session_state.conversation_history):
-        if query.startswith("AI:"):
-            st.text("AI: " + response)
-        else:
-            st.text("User: " + query)
+user_input = get_text()
+if file and city:
+    output = conversation.run(input=user_input)
+
+    st.session_state.past.append(user_input)
+    bike_image_analysis = get_image_text(file)
+    st.session_state.generated.append("Does this sound like your bike? " + bike_image_analysis)
+    if user_input == "yes":
+        output = conversation_agent.run(
+            f"The user has had their bike stolen from them, please help them find it. DESCRIPTION: {bike_image_analysis} LOCATION: {city}. Once you have the links for the ad STOP & provide them the links to the ads."
+        )
+        st.session_state.generated.append(output)
+
+if st.session_state.get("generated"):
+    generated_length = len(st.session_state.generated)
+    for i in range(generated_length - 1, -1, -1):
+        message(st.session_state.generated[i], key=str(i))
+        if i < len(st.session_state.past):
+            message(st.session_state.past[i], is_user=True, key=str(i) + "_user")
+
