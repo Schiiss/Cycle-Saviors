@@ -13,7 +13,7 @@ import re
 from langchain import LLMChain, OpenAI
 from dotenv import load_dotenv
 from PIL import Image
-# from transformers import ViltProcessor, ViltForQuestionAnswering
+from transformers import AutoProcessor, BlipForQuestionAnswering
 
 ####################################################
 # BACKGROUND CONFIGURATIONS AND CACHE
@@ -28,13 +28,13 @@ st.set_page_config(layout='wide', initial_sidebar_state='collapsed')
 
 @st.cache_resource
 def load_models():
-    # image_text_processor = ViltProcessor.from_pretrained("dandelin/vilt-b32-finetuned-vqa")
-    # image_text_model = ViltForQuestionAnswering.from_pretrained("dandelin/vilt-b32-finetuned-vqa")
+    image_text_model = BlipForQuestionAnswering.from_pretrained("Salesforce/blip-vqa-base")
+    image_text_processor = AutoProcessor.from_pretrained("Salesforce/blip-vqa-base")
     image_embedding_model = SentenceTransformer("clip-ViT-B-32")
     st.success('All models initialized and cached!!!')
-    return image_embedding_model
+    return image_text_processor, image_text_model, image_embedding_model
 
-image_embedding_model = load_models()
+image_text_processor, image_text_model, image_embedding_model = load_models()
 
 # initialize pinecone index once with cache
 @st.cache_resource
@@ -93,18 +93,14 @@ def get_image_text(filepath: str):
     image = Image.open(filepath)
 
     text = "what color is this bike?"
-    encoding = image_text_processor(image, text, return_tensors="pt")
-    outputs = image_text_model(**encoding)
-    logits = outputs.logits
-    idx = logits.argmax(-1).item()
-    text_output1 = image_text_model.config.id2label[idx]
+    inputs = image_text_processor(images=image, text=text, return_tensors="pt")
+    outputs = image_text_model.generate(**inputs)
+    text_output1 = image_text_processor.decode(outputs[0], skip_special_tokens=True)
 
     text = "what type of bike is this?"
-    encoding = image_text_processor(image, text, return_tensors="pt")
-    outputs = image_text_model(**encoding)
-    logits = outputs.logits
-    idx = logits.argmax(-1).item()
-    text_output2 = image_text_model.config.id2label[idx]
+    inputs = image_text_processor(images=image, text=text, return_tensors="pt")
+    outputs = image_text_model.generate(**inputs)
+    text_output2 = image_text_processor.decode(outputs[0], skip_special_tokens=True)
 
     return f'A {text_output1} {text_output2} bike'
 
@@ -264,8 +260,8 @@ with col2:
     file = chatbot.ask_file()
     city = st.selectbox('Please select a city (REQUIRED)', ['SELECT CITY', 'calgary', 'edmonton', 'vancouver'])
     if file and city:
-        # bike_image_analysis = get_image_text(file)
-        st.text(f"AI: Does this sound like your bike? {'PLACEHOLDER'}")
+        bike_image_analysis = get_image_text(file)
+        st.text(f"AI: Does this sound like your bike? {bike_image_analysis}")
         user_response = st.text_input('User Response:')
         if user_response.lower() == 'yes':
             output = conversation_agent.run(
