@@ -276,47 +276,48 @@ if "generated" not in st.session_state:
     st.session_state.generated = []
 if "past" not in st.session_state:
     st.session_state.past = []
-chatbot = ChatBot()
-file = chatbot.ask_file()
-city = st.selectbox('Please select a city (REQUIRED)', ['SELECT CITY', 'calgary', 'edmonton', 'vancouver'])
-user_input = get_text()
-if file and city:
-    output = conversation.run(input=user_input)
-    st.session_state.past.append(user_input)
-    bike_image_analysis = get_image_text(file)
-    st.session_state.generated.append("Does this sound like your bike? " + bike_image_analysis)
-    if user_input == "yes":
-        output = conversation_agent.run(
-            f"The user has had their bike stolen from them, please help them find it. DESCRIPTION: {bike_image_analysis} LOCATION: {city}. Once you have the links for the ad STOP & provide them the links to the ads."
-        )
-        st.session_state.generated.append(output)
-        st.session_state['pinecone_output'] = get_filtered_results(city, "black", "Trek")
-        with col1:
-            if st.session_state['pinecone_output']:
-                html_placeholder = '<html><h6>Ads found online that match your image and description</h6>'
-                for data in st.session_state['pinecone_output']:
+with col2:
+    chatbot = ChatBot()
+    file = chatbot.ask_file()
+    city = st.selectbox('Please select a city (REQUIRED)', ['SELECT CITY', 'calgary', 'edmonton', 'vancouver'])
+    user_input = get_text()
+    if file and city:
+        output = conversation.run(input=user_input)
+        st.session_state.past.append(user_input)
+        bike_image_analysis = get_image_text(file)
+        st.session_state.generated.append("Does this sound like your bike? " + bike_image_analysis)
+        if user_input == "yes":
+            output = conversation_agent.run(
+                f"The user has had their bike stolen from them, please help them find it. DESCRIPTION: {bike_image_analysis} LOCATION: {city}. Once you have a final anwser, say 'I have found a list of potential matches for your stolen bike.'"
+            )
+            st.session_state.generated.append(output)
+            st.session_state['pinecone_output'] = get_filtered_results(city, "black", "Trek")
+            with col1:
+                if st.session_state['pinecone_output']:
+                    html_placeholder = '<html><h6>Ads found online that match your image and description</h6>'
+                    for data in st.session_state['pinecone_output']:
 
-                    listed_date = str(data['list_date']).split('.')[0]
+                        listed_date = str(data['list_date']).split('.')[0]
 
-                    html_placeholder += '<div style="background-color: rgba(213, 238, 247, 0.5);' \
-                        'border-radius: 10px; padding: 10px; margin-bottom: 20px;><table style="border: none;' \
-                        'background-color: lightblue; border-radius: 10px;">'
-                    
-                    html_placeholder += '<tr style="border: none;">' \
-                        f'<h3><a href={data["ad_link"]} style="text-decoration:none;" target="_blank">{data["ad_title"]}</a></h3>' \
-                        f'</tr><tr style="border: none;"><strong>Ad Source: </strong>{data["source"]} <br>' \
-                        f'<strong>Ad Location: </strong>{data["ad_location"]} <br>' \
-                        f'<strong>Ad List Date: </strong>{listed_date[0:4]+"-"+listed_date[4:6]+"-"+listed_date[6:]}<br>' \
-                        f'<br></tr><tr style="border: none;"><img src={data["image_link"]} alt=Ad Id: {data["source_id"]}></tr><br></table></div>'
+                        html_placeholder += '<div style="background-color: rgba(213, 238, 247, 0.5);' \
+                            'border-radius: 10px; padding: 10px; margin-bottom: 20px;><table style="border: none;' \
+                            'background-color: lightblue; border-radius: 10px;">'
+                        
+                        html_placeholder += '<tr style="border: none;">' \
+                            f'<h3><a href={data["ad_link"]} style="text-decoration:none;" target="_blank">{data["ad_title"]}</a></h3>' \
+                            f'</tr><tr style="border: none;"><strong>Ad Source: </strong>{data["source"]} <br>' \
+                            f'<strong>Ad Location: </strong>{data["ad_location"]} <br>' \
+                            f'<strong>Ad List Date: </strong>{listed_date[0:4]+"-"+listed_date[4:6]+"-"+listed_date[6:]}<br>' \
+                            f'<br></tr><tr style="border: none;"><img src={data["image_link"]} alt=Ad Id: {data["source_id"]}></tr><br></table></div>'
 
-                html_placeholder += '</html>'
+                    html_placeholder += '</html>'
 
-                st.markdown(html_placeholder, unsafe_allow_html=True)
+                    st.markdown(html_placeholder, unsafe_allow_html=True)
 
-if st.session_state.get("generated"):
-    generated_length = len(st.session_state.generated)
-    for i in range(generated_length - 1, -1, -1):
-        message(st.session_state.generated[i], key=str(i))
-        if i < len(st.session_state.past):
-            message(st.session_state.past[i], is_user=True, key=str(i) + "_user")
+    if st.session_state.get("generated"):
+        generated_length = len(st.session_state.generated)
+        for i in range(generated_length - 1, -1, -1):
+            message(st.session_state.generated[i], key=str(i))
+            if i < len(st.session_state.past):
+                message(st.session_state.past[i], is_user=True, key=str(i) + "_user")
 
