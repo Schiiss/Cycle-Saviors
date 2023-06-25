@@ -6,14 +6,9 @@ https://bikeindex.org/documentation/api_v3
 from tqdm import tqdm
 import yaml
 import structlog
-import pandas as pd
-from src.kijiji_utils import KijijiScrape
 from src.bike_index_utils import BikeIndex
-from bs4 import BeautifulSoup
-from pathlib import Path
 import os
 from src.io_utils import download_image_card
-from datetime import datetime
 from tqdm import tqdm
 
 logger = structlog.getLogger(__name__)
