@@ -4,14 +4,6 @@
 	"name": "Python 3",
 	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
 	"image": "mcr.microsoft.com/devcontainers/python:0-3.10",
-	"customizations": {
-		"vscode": {
-			"extensions": [
-				"njpwerner.autodocstring",
-				"ms-toolsai.jupyter"
-			]
-		}
-	},
 
 	// Set environment variables container wide
 	"runArgs": ["--env-file","configs/.env"], 
@@ -23,7 +15,7 @@
 	// "forwardPorts": [],
 
 	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "sudo apt-get update && sudo apt-get -y install dos2unix && dos2unix .devcontainer/post-create.sh && sh .devcontainer/post-create.sh"
+	"postCreateCommand": "sudo apt-get update && sh .devcontainer/post-create.sh"
 	// Configure tool-specific properties.
 	// "customizations": {},
 

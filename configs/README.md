@@ -1,1 +1,0 @@
-Repository secrets can live in `.env`
