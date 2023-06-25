@@ -34,6 +34,7 @@ Dependency management and environment are handled in `devcontainer`
 #### File Structure
 Overview of repository codebase
 
+```
 ├── .devcontainer           # Containerized environment management
 ├── app                     # Frontend application files
 ├── configs                 # Secrets
@@ -47,3 +48,4 @@ Overview of repository codebase
 ├── requirements.txt
 ├── setup.cfg
 └── README.md
+```
