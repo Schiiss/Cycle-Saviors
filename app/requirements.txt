@@ -1,4 +1,5 @@
 streamlit==1.23.1
+streamlit-chat==0.1.0
 pinecone-client==2.2.2
 sentence-transformers==2.2.2
 openai==0.27.0
