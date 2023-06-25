@@ -16,17 +16,18 @@ from dotenv import load_dotenv
 from PIL import Image
 from transformers import AutoProcessor, BlipForQuestionAnswering
 from langchain.chains import ConversationChain
+import boto3
 
 ####################################################
 # BACKGROUND CONFIGURATIONS AND CACHE
 ####################################################
 load_dotenv()
-
-# os.environ['OPENAI_API_KEY'] = os.getenv('OPENAI_API_KEY')
+os.environ['OPENAI_API_KEY'] = os.getenv('OPENAI_API_KEY')
 
 llm = OpenAI(model_name='text-davinci-003', temperature=0)
 
-st.set_page_config(layout='wide', initial_sidebar_state='collapsed')
+st.set_page_config(layout='wide', page_title="Find My Bike!", page_icon=":robot:")
+st.title('Find My Bike!')
 
 @st.cache_resource
 def load_models():
@@ -38,7 +39,6 @@ def load_models():
 
 image_text_processor, image_text_model, image_embedding_model = load_models()
 
-# initialize pinecone index once with cache
 @st.cache_resource
 def load_pinecone(index_name):
     PINECONE_API_KEY = os.getenv('PINECONE_API_KEY')
@@ -51,11 +51,15 @@ def load_pinecone(index_name):
 
 index = load_pinecone('cycle-saviours')
 
-if 'conversation_history' not in st.session_state:
-    st.session_state['conversation_history'] = []
+ai_introduction = "Hi, I am the Cycle Saviors stolen bike finding assistant." \
+                  "I search online marketplaces for your stolen bike as thieves often list bikes on these spaces."\
+                  "Start by uploading an image and selecting the location where the bike was stolen from."
 
-if 'ai_response_history' not in st.session_state:
-    st.session_state['ai_response_history'] = []
+if "generated" not in st.session_state:
+    st.session_state["generated"] = [ai_introduction]
+
+if "past" not in st.session_state:
+    st.session_state["past"] = []
 
 if 'pinecone_output' not in st.session_state:
     st.session_state['pinecone_output'] = []
@@ -63,8 +67,6 @@ if 'pinecone_output' not in st.session_state:
 ####################################################
 # UI CODE
 ####################################################
-st.markdown("<h1>Find My Stolen Bike!</h1>", unsafe_allow_html=True)
-
 col1, col2 = st.columns([0.7, 0.3])
 
 def get_filtered_results(location: str, color: str, bike_model: str):
@@ -162,60 +164,6 @@ class CustomOutputParser(AgentOutputParser):
         # Return the action and action input
         return AgentAction(tool=action, tool_input=action_input.strip(" ").strip('"'), log=llm_output)
 
-
-output_parser = CustomOutputParser()
-
-# Set up the base template
-template_with_history = """Assistant is designed to be able to assist with finding a users stolen bike.
-
-Assistant has access to the following tools:
-
-{tools}
-
-Use the following format:
-
-Question: the input question you must answer
-Thought: you should always think about what to do
-Action: the action to take, should be one of [{tool_names}]
-Action Input: the input to the action
-Observation: the result of the action
-... (this Thought/Action/Action Input/Observation can repeat N times)
-Thought: I now know the final answer
-Final Answer: the final answer to the original input question
-
-Begin!
-
-Previous conversation history:
-{history}
-
-New question: {input}
-{agent_scratchpad}"""
-
-prompt_with_history = CustomPromptTemplate(
-    template=template_with_history,
-    tools=tools,
-    input_variables=["input", "intermediate_steps", "history"]
-)
-
-llm_chain = LLMChain(llm=llm, prompt=prompt_with_history)
-
-tool_names = [tool.name for tool in tools]
-agent = LLMSingleActionAgent(
-    llm_chain=llm_chain,
-    output_parser=output_parser,
-    stop=["\nObservation:"],
-    allowed_tools=tool_names
-)
-
-memory = ConversationBufferWindowMemory(k=5)
-
-agent_executor = AgentExecutor.from_agent_and_tools(
-    agent=agent,
-    tools=tools,
-    verbose=True,
-    memory=memory
-)
-
 memory = ConversationBufferMemory(memory_key="chat_history")
 
 conversation_agent = initialize_agent(
@@ -223,16 +171,7 @@ conversation_agent = initialize_agent(
 
 class ChatBot:
     def __init__(self):
-        self.color = None
-        self.location = None
-
-    def ask_color(self):
-        self.color = st.text_input("AI: What color is your bike?")
-        return self.color
-
-    def ask_location(self):
-        self.location = st.text_input("AI: Where was it stolen?")
-        return self.location
+        pass
 
     def save_uploaded_file(self, uploaded_file):
         UPLOAD_DIR = "data/images"
@@ -241,52 +180,50 @@ class ChatBot:
 
         file_path = os.path.join(UPLOAD_DIR, uploaded_file.name)
 
+        # save to AWS as well
+        session = boto3.Session()
+        s3 = session.client("s3")
+        s3.upload_file(file_path, 'cycle-saviours', uploaded_file.name, 
+                    ExtraArgs=dict(ContentType='image/png'))
+
         with open(file_path, "wb") as f:
             f.write(uploaded_file.getbuffer())
 
         return file_path
 
     def ask_file(self):
-        uploaded_file = st.file_uploader("Please upload an image of your bike (REQUIRED)",
-                                         type=["jpg", "jpeg", "png"])
+        with st.sidebar:
+            uploaded_file = st.file_uploader("Please upload an image of your bike (REQUIRED)",
+                                            type=["jpg", "jpeg", "png"])
 
-        if uploaded_file is not None:
-            file_path = self.save_uploaded_file(uploaded_file)
-            st.success("File saved successfully.")
-            return file_path
-        else:
-            return None
+            if uploaded_file is not None:
+                file_path = self.save_uploaded_file(uploaded_file)
+                st.success("File saved successfully.")
+                return file_path
+            else:
+                return None
         
 conversation = ConversationChain(
     llm=llm,
     memory=ConversationBufferMemory()
 )
 
-if "generated" not in st.session_state:
-    st.session_state["generated"] = []
-
-if "past" not in st.session_state:
-    st.session_state["past"] = []
-
 def get_text():
-    input_text = st.text_input("You: ", "Can you help me find my stolen bike?", key="input")
+    input_text = st.text_input("Our Chat Assistant", key="input")
     return input_text
 
-if "generated" not in st.session_state:
-    st.session_state.generated = []
-if "past" not in st.session_state:
-    st.session_state.past = []
 with col2:
     chatbot = ChatBot()
     file = chatbot.ask_file()
-    city = st.selectbox('Please select a city (REQUIRED)', ['SELECT CITY', 'calgary', 'edmonton', 'vancouver'])
+    with st.sidebar:
+        city = st.selectbox('Please select a city (REQUIRED)', ['SELECT CITY', 'calgary', 'edmonton', 'vancouver'])
     user_input = get_text()
-    if file and city:
+    if file and city != 'SELECT CITY':
         output = conversation.run(input=user_input)
-        st.session_state.past.append(user_input)
         bike_image_analysis = get_image_text(file)
-        st.session_state.generated.append("Does this sound like your bike? " + bike_image_analysis)
+        st.session_state.generated.append(f"You uploaded an image of {bike_image_analysis} does this sound correct")
         if user_input == "yes":
+            st.session_state.past.append(user_input)
             output = conversation_agent.run(
                 f"The user has had their bike stolen from them, please help them find it. DESCRIPTION: {bike_image_analysis} LOCATION: {city}. Once you have a final anwser, say 'I have found a list of potential matches for your stolen bike.'"
             )
@@ -315,9 +252,10 @@ with col2:
                     st.markdown(html_placeholder, unsafe_allow_html=True)
 
     if st.session_state.get("generated"):
-        generated_length = len(st.session_state.generated)
+        generated = list(set(st.session_state.generated))
+        generated_length = len(generated)
         for i in range(generated_length - 1, -1, -1):
-            message(st.session_state.generated[i], key=str(i))
-            if i < len(st.session_state.past):
-                message(st.session_state.past[i], is_user=True, key=str(i) + "_user")
-
+            message(generated[i], key=str(i))
+            if i == 2:
+                print(st.session_state['past'])
+                message(st.session_state.past[0], is_user=True, key=str(i) + "_user")
