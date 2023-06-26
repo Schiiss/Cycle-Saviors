@@ -18,7 +18,8 @@ We want to help fill the gap in stolen bike searchability by creating a bike the
 <strong>This tool differs from current search solutions in that we use vector embeddings of images along with textual metadata to filter and find similar ads listed in online marketplaces based on vector similarity. This is a much more efficient way to find a stolen bike versus keyword search.</strong>
 
 ## Proposed Architecture
-Conner to update
+
+![image info](./public/hackathon.png)
 
 ## Getting Started
 Dependency management and environment are handled in `devcontainer`
